@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Juego Educativo de Puntería en la Cocina</title>
+    <!-- PWA Web App Manifest inline blob script -->
+    <link rel="manifest" id="manifest-placeholder">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Custom Styles & Game Elements */
+        body {
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background-color: #0f172a;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1200px;
+            max-height: 800px;
+            margin: 0 auto;
+            background: #1e293b;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        /* Chalkboard overlay (Bottom Left) */
+        .chalkboard {
+            position: absolute;
+            bottom: 2%;
+            left: 2%;
+            width: 38%;
+            max-width: 320px;
+            height: 35%;
+            max-height: 220px;
+            background: #1c3322;
+            border: 5px solid #6d4c41;
+            border-radius: 12px;
+            box-shadow: 4px 4px 15px rgba(0,0,0,0.6), inset 0 0 20px rgba(0,0,0,0.8);
+            z-index: 20;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chalkboard-title {
+            color: #e0e0e0;
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            text-align: center;
+            font-size: 0.8rem;
+            border-bottom: 2px dashed #426946;
+            padding-bottom: 2px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .chalkboard-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 4px;
+            flex: 1;
+            align-items: center;
+            justify-items: center;
+            min-height: 0;
+        }
+
+        .chalk-item {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            overflow: hidden;
+            padding: 2px;
+        }
+
+        .chalk-item svg {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+        }
+
+        .chalk-item.found {
+            opacity: 0.3;
+            filter: grayscale(80%);
+        }
+
+        .chalk-item.found::after {
+            content: '✓';
+            position: absolute;
+            color: #4ade80;
+            font-size: 1.3rem;
+            font-weight: bold;
+            text-shadow: 0 0 5px #000;
+        }
+
+        /* Targets overlay container */
+        #targets-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .target-item {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            pointer-events: auto;
+            transition: transform 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.6));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            padding: 4px;
+            touch-action: manipulation;
+            background: rgba(15, 23, 42, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .target-item svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .target-item:hover, .target-item:active {
+            transform: translate(-50%, -50%) scale(1.2);
+            border-color: #f59e0b;
+        }
+
+        /* Trajectory Line SVG */
+        #trajectory-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        /* Interactive Slingshot Launcher Area (Bottom Center) */
+        #ball-launcher {
+            position: absolute;
+            bottom: 3%;
+            left: 44%;
+            width: 60px;
+            height: 60px;
+            z-index: 25;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        #ball {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 14px 14px, #ff4e50, #f9d423);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.4), inset -3px -3px 8px rgba(0,0,0,0.5);
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            z-index: 26;
+            transition: none;
+        }
+
+        /* Bottom Right Stats & Control Panel HUD */
+        #stats-panel {
+            position: absolute;
+            bottom: 2%;
+            right: 2%;
+            z-index: 30;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(51, 65, 85, 0.8);
+            border-radius: 14px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            max-width: 44%;
+        }
+
+        /* Custom Popup Modal */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Floating Feedback animations */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, 0) scale(0.8); }
+            50% { opacity: 1; transform: translate(-50%, -30px) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -60px) scale(1); }
+        }
+
+        .feedback-pop {
+            position: absolute;
+            z-index: 30;
+            font-weight: 900;
+            font-size: 1.4rem;
+            pointer-events: none;
+            animation: floatUp 1.2s forwards ease-out;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+        }
+
+        /* Responsive tuning for Phones & Tablets */
+        @media (max-width: 768px) {
+            .chalkboard {
+                width: 42%;
+                height: 36%;
+                bottom: 1.5%;
+                left: 1.5%;
+                padding: 4px;
+            }
+            .chalkboard-title { 
+                font-size: 0.65rem; 
+                margin-bottom: 2px;
+            }
+            #stats-panel {
+                padding: 6px 8px;
+                max-width: 48%;
+                bottom: 1.5%;
+                right: 1.5%;
+            }
+            #ball-launcher { 
+                left: 45%; 
+                bottom: 2%; 
+                width: 52px; 
+                height: 52px; 
+            }
+            #ball {
+                width: 38px;
+                height: 38px;
+                top: 7px;
+                left: 7px;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-slate-950 text-white p-0 sm:p-2">
+
+    <!-- Main Container -->
+    <div id="game-container" class="w-full h-full sm:rounded-2xl relative shadow-2xl overflow-hidden">
+        
+        <!-- Background Kitchen Illustration matching interactive theme -->
+        <div id="bg-kitchen-svg" class="absolute inset-0 w-full h-full z-1 overflow-hidden pointer-events-none">
+            <svg viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" class="w-full h-full">
+                <defs>
+                    <pattern id="tile-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <rect width="40" height="40" fill="#f3e5ab" stroke="#e0cb91" stroke-width="1.5"/>
+                    </pattern>
+                    <pattern id="floor-tile" width="100" height="100" patternUnits="userSpaceOnUse">
+                        <rect width="100" height="100" fill="#e8c89b" stroke="#c8a474" stroke-width="2"/>
+                    </pattern>
+                </defs>
+
+                <!-- Floor & Wall -->
+                <rect y="580" width="1200" height="220" fill="url(#floor-tile)"/>
+                <rect width="1200" height="580" fill="url(#tile-pattern)"/>
+
+                <!-- REFRIGERATOR (Left) -->
+                <g id="fridge">
+                    <rect x="15" y="140" width="250" height="540" rx="15" fill="#94a3b8" stroke="#1e293b" stroke-width="5"/>
+                    <rect x="25" y="150" width="230" height="235" rx="10" fill="#cbd5e1" stroke="#334155" stroke-width="3"/>
+                    <rect x="25" y="395" width="230" height="275" rx="10" fill="#cbd5e1" stroke="#334155" stroke-width="3"/>
+                    <rect x="55" y="210" width="60" height="85" rx="6" fill="#1e293b"/>
+                    <rect x="68" y="225" width="34" height="45" rx="3" fill="#38bdf8"/>
+                    <rect x="235" y="200" width="12" height="120" rx="6" fill="#64748b" stroke="#0f172a"/>
+                    <rect x="235" y="420" width="12" height="140" rx="6" fill="#64748b" stroke="#0f172a"/>
+                </g>
+
+                <!-- UPPER WOODEN CABINETS -->
+                <g id="upper-cabinets">
+                    <!-- Corner Cabinet Left -->
+                    <rect x="280" y="30" width="170" height="190" fill="#b45309" stroke="#451a03" stroke-width="5" rx="6"/>
+                    <rect x="290" y="40" width="70" height="170" fill="#78350f" stroke="#451a03" stroke-width="3" rx="4"/>
+                    <rect x="370" y="40" width="70" height="170" fill="#78350f" stroke="#451a03" stroke-width="3" rx="4"/>
+                    <circle cx="350" cy="125" r="5" fill="#fbbf24"/>
+                    <circle cx="380" cy="125" r="5" fill="#fbbf24"/>
+
+                    <!-- Right Main Cabinets -->
+                    <rect x="670" y="20" width="210" height="200" fill="#b45309" stroke="#451a03" stroke-width="5" rx="6"/>
+                    <rect x="680" y="30" width="90" height="180" fill="#78350f" stroke="#451a03" stroke-width="3" rx="4"/>
+                    <rect x="780" y="30" width="90" height="180" fill="#78350f" stroke="#451a03" stroke-width="3" rx="4"/>
+                    <circle cx="760" cy="120" r="5" fill="#fbbf24"/>
+                    <circle cx="790" cy="120" r="5" fill="#fbbf24"/>
+
+                    <!-- Far Right Open Shelves with Jars -->
+                    <rect x="895" y="20" width="290" height="220" fill="#b45309" stroke="#451a03" stroke-width="5" rx="6"/>
+                    <line x1="895" y1="90" x2="1185" y2="90" stroke="#451a03" stroke-width="6"/>
+                    <line x1="895" y1="160" x2="1185" y2="160" stroke="#451a03" stroke-width="6"/>
+                    <rect x="915" y="40" width="28" height="42" rx="3" fill="#fbbf24"/>
+                    <rect x="950" y="35" width="32" height="47" rx="3" fill="#ea580c"/>
+                    <rect x="990" y="45" width="22" height="37" rx="3" fill="#64748b"/>
+                    <rect x="1020" y="30" width="38" height="52" rx="3" fill="#f8fafc"/>
+                    <rect x="910" y="105" width="32" height="48" rx="3" fill="#f59e0b"/>
+                    <rect x="950" y="100" width="38" height="53" rx="3" fill="#dc2626"/>
+                    <rect x="995" y="102" width="34" height="50" rx="3" fill="#9a3412"/>
+                </g>
+
+                <!-- RANGE HOOD & STOVE (Center) -->
+                <g id="range-hood-stove">
+                    <polygon points="480,20 630,20 650,170 460,170" fill="#cbd5e1" stroke="#1e293b" stroke-width="4"/>
+                    <rect x="460" y="170" width="190" height="30" fill="#94a3b8" stroke="#1e293b" stroke-width="3"/>
+                    <circle cx="610" cy="185" r="4" fill="#ef4444"/>
+                    <circle cx="625" cy="185" r="4" fill="#22c55e"/>
+
+                    <line x1="480" y1="215" x2="630" y2="215" stroke="#475569" stroke-width="4"/>
+                    <path d="M 495 215 L 495 255 M 525 215 L 525 260 M 555 215 L 555 255 M 585 215 L 585 265" stroke="#334155" stroke-width="3"/>
+
+                    <rect x="450" y="360" width="210" height="240" fill="#e2e8f0" stroke="#1e293b" stroke-width="5" rx="5"/>
+                    <rect x="460" y="370" width="190" height="55" fill="#64748b" rx="4"/>
+                    <circle cx="480" cy="397" r="8" fill="#0f172a"/>
+                    <circle cx="510" cy="397" r="8" fill="#0f172a"/>
+                    <rect x="535" y="387" width="40" height="20" fill="#0f172a" rx="2"/>
+                    <circle cx="600" cy="397" r="8" fill="#0f172a"/>
+                    <circle cx="630" cy="397" r="8" fill="#0f172a"/>
+
+                    <rect x="465" y="435" width="180" height="150" fill="#334155" rx="5"/>
+                    <rect x="480" y="450" width="150" height="95" fill="#0f172a" rx="3"/>
+                    <rect x="500" y="560" width="110" height="12" rx="4" fill="#cbd5e1"/>
+
+                    <!-- Pot on stove -->
+                    <rect x="515" y="315" width="85" height="45" rx="6" fill="#64748b" stroke="#0f172a" stroke-width="3"/>
+                    <path d="M 535 315 Q 557 295 580 315 Z" fill="#475569" stroke="#0f172a" stroke-width="2"/>
+                </g>
+
+                <!-- COUNTERTOP & APPLIANCES -->
+                <g id="countertop">
+                    <rect x="270" y="410" width="180" height="190" fill="#d97706" stroke="#451a03" stroke-width="4"/>
+                    <rect x="660" y="410" width="530" height="220" fill="#d97706" stroke="#451a03" stroke-width="4"/>
+                    <rect x="260" y="395" width="195" height="20" fill="#fde68a" stroke="#b45309" stroke-width="3" rx="4"/>
+                    <rect x="650" y="395" width="550" height="20" fill="#fde68a" stroke="#b45309" stroke-width="3" rx="4"/>
+
+                    <!-- Left Microwave -->
+                    <rect x="270" y="285" width="135" height="110" rx="8" fill="#cbd5e1" stroke="#1e293b" stroke-width="4"/>
+                    <rect x="280" y="300" width="85" height="80" rx="4" fill="#0f172a"/>
+                    <rect x="375" y="300" width="20" height="80" rx="3" fill="#64748b"/>
+
+                    <!-- Sink -->
+                    <rect x="690" y="400" width="160" height="25" fill="#94a3b8" rx="3"/>
+                    <path d="M 760 400 C 760 340 730 340 730 365" fill="none" stroke="#cbd5e1" stroke-width="10" stroke-linecap="round"/>
+
+                    <!-- Blender -->
+                    <rect x="855" y="325" width="45" height="70" fill="#ef4444" rx="6" stroke="#7f1d1d" stroke-width="3"/>
+                    <polygon points="860,325 895,325 890,255 865,255" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
+
+                    <!-- Right Microwave -->
+                    <rect x="925" y="305" width="125" height="90" rx="8" fill="#e2e8f0" stroke="#1e293b" stroke-width="4"/>
+                    <rect x="935" y="315" width="80" height="70" rx="4" fill="#0f172a"/>
+
+                    <!-- Mixer -->
+                    <path d="M 1060 395 C 1060 300 1140 300 1170 330 L 1170 395 Z" fill="#94a3b8" stroke="#1e293b" stroke-width="4"/>
+
+                    <!-- Washing Machine -->
+                    <rect x="900" y="440" width="180" height="210" fill="#f8fafc" stroke="#334155" stroke-width="4" rx="6"/>
+                    <rect x="915" y="455" width="150" height="35" fill="#e2e8f0" rx="3"/>
+                    <circle cx="1035" cy="472" r="10" fill="#0284c7"/>
+                    <circle cx="990" cy="560" r="55" fill="#475569"/>
+                    <circle cx="990" cy="560" r="42" fill="#0f172a"/>
+                </g>
+
+                <!-- KITCHEN ISLAND & STOOLS (Front) -->
+                <g id="kitchen-island">
+                    <rect x="150" y="500" width="800" height="250" fill="#d97706" stroke="#451a03" stroke-width="6" rx="10"/>
+                    <rect x="130" y="490" width="840" height="30" fill="#fef08a" stroke="#b45309" stroke-width="4" rx="8"/>
+
+                    <!-- Stools -->
+                    <ellipse cx="310" cy="610" rx="60" ry="20" fill="#b45309" stroke="#451a03" stroke-width="4"/>
+                    <rect x="270" y="610" width="15" height="150" fill="#78350f"/>
+                    <rect x="335" y="610" width="15" height="150" fill="#78350f"/>
+
+                    <ellipse cx="540" cy="610" rx="60" ry="20" fill="#b45309" stroke="#451a03" stroke-width="4"/>
+                    <rect x="500" y="610" width="15" height="150" fill="#78350f"/>
+                    <rect x="565" y="610" width="15" height="150" fill="#78350f"/>
+
+                    <!-- Fruit Bowl -->
+                    <ellipse cx="730" cy="500" rx="70" ry="20" fill="#f59e0b" stroke="#78350f" stroke-width="3"/>
+                    <path d="M 670 490 Q 710 515 740 480 Q 710 495 670 490 Z" fill="#eab308"/>
+                    <circle cx="725" cy="475" r="18" fill="#ef4444"/>
+                    <circle cx="700" cy="490" r="16" fill="#22c55e"/>
+                    <circle cx="750" cy="490" r="17" fill="#f97316"/>
+
+                    <!-- Potted Plant -->
+                    <rect x="820" y="460" width="60" height="40" rx="5" fill="#0284c7" stroke="#0369a1" stroke-width="3"/>
+                    <circle cx="830" cy="440" r="22" fill="#16a34a"/>
+                    <circle cx="850" cy="425" r="25" fill="#22c55e"/>
+                    <circle cx="870" cy="440" r="20" fill="#15803d"/>
+                </g>
+            </svg>
+        </div>
+
+        <!-- Targets Layer (Kitchen interactive items) -->
+        <div id="targets-layer"></div>
+
+        <!-- SVG overlay for drawing drag slingshot line -->
+        <svg id="trajectory-svg">
+            <line id="slingshot-line" x1="0" y1="0" x2="0" y2="0" stroke="rgba(255, 235, 59, 0.85)" stroke-width="4" stroke-dasharray="6,6" />
+        </svg>
+
+        <!-- Slingshot Launcher & Ball (Bottom Center) -->
+        <div id="ball-launcher">
+            <div id="ball"></div>
+        </div>
+
+        <!-- Chalkboard Overlay (Bottom Left) -->
+        <div class="chalkboard">
+            <div class="chalkboard-title">
+                <i class="fa-solid fa-chalkboard mr-1 text-amber-200"></i>
+                <span id="chalkboard-title-text">Pizarrón de Metas</span>
+            </div>
+            <div id="chalkboard-grid" class="chalkboard-grid">
+                <!-- 10 targets generated dynamically -->
+            </div>
+        </div>
+
+        <!-- Level & Stats HUD Panel (Bottom Right) -->
+        <div id="stats-panel">
+            <!-- Level Display -->
+            <div class="flex items-center space-x-1.5 border-b border-slate-700/80 pb-1">
+                <i class="fa-solid fa-trophy text-amber-400 text-xs sm:text-sm"></i>
+                <span id="level-display" class="font-bold text-xs sm:text-sm text-amber-300 truncate">Nivel 1: Figuras</span>
+            </div>
+
+            <!-- Score / Misses -->
+            <div class="flex items-center justify-between gap-1.5">
+                <div class="flex items-center space-x-1 bg-emerald-950/70 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                    <i class="fa-solid fa-circle-check text-emerald-400 text-xs"></i>
+                    <span class="text-[10px] sm:text-xs font-semibold text-slate-200">Aciertos:</span>
+                    <span id="hits-count" class="text-xs sm:text-sm font-black text-emerald-400">0</span>
+                    <span class="text-[9px] text-slate-400">/10</span>
+                </div>
+
+                <div class="flex items-center space-x-1 bg-rose-950/70 px-2 py-0.5 rounded-lg border border-rose-500/30">
+                    <i class="fa-solid fa-circle-xmark text-rose-400 text-xs"></i>
+                    <span class="text-[10px] sm:text-xs font-semibold text-slate-200">Fallas:</span>
+                    <span id="misses-count" class="text-xs sm:text-sm font-black text-rose-400">0</span>
+                    <span class="text-[9px] text-slate-400">(Máx 4)</span>
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex space-x-1.5 pt-0.5">
+                <button id="btn-audio" onclick="toggleAudio()" class="p-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-600 transition text-xs flex-1 flex items-center justify-center space-x-1" title="Activar/Desactivar Voz">
+                    <i id="audio-icon" class="fa-solid fa-volume-high text-sky-400"></i>
+                    <span class="text-[10px] sm:text-xs hidden xs:inline">Voz</span>
+                </button>
+                <button onclick="restartCurrentLevel()" class="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold text-[10px] sm:text-xs transition shadow flex-1 flex items-center justify-center">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> Reiniciar
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Popup (Level Clear / Game Over / Instructions) -->
+        <div id="modal" class="modal-overlay hidden">
+            <div class="bg-slate-800 border-2 border-slate-600 rounded-2xl p-6 max-w-md w-11/12 text-center shadow-2xl transform transition-all relative z-50">
+                <div id="modal-icon" class="text-5xl mb-3">🎉</div>
+                <h2 id="modal-title" class="text-2xl font-bold text-white mb-2">¡Bienvenido!</h2>
+                <p id="modal-message" class="text-slate-300 mb-6 text-sm sm:text-base">
+                    Lanza la pelota hacia los objetos de la cocina que coincidan en FORMA/CONTENIDO y COLOR con los del pizarrón.
+                </p>
+                <button id="modal-btn" onclick="closeModal()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl shadow-lg transition cursor-pointer pointer-events-auto">
+                    ¡EMPEZAR A JUGAR!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Game Engine -->
+    <script>
+        // PWA Manifest dynamic creation
+        (function setupPWA() {
+            const manifest = {
+                name: "Juego Educativo Cocina PWA",
+                short_name: "CocinaJuego",
+                start_url: ".",
+                display: "standalone",
+                background_color: "#0f172a",
+                theme_color: "#0f172a",
+                icons: [{
+                    src: "https://placehold.co/192x192/10b981/ffffff?text=Juego",
+                    sizes: "192x192",
+                    type: "image/png"
+                }]
+            };
+            const stringManifest = JSON.stringify(manifest);
+            const blob = new Blob([stringManifest], {type: 'application/json'});
+            const manifestURL = URL.createObjectURL(blob);
+            document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+        })();
+
+        // Color definitions with Latin Spanish names and Hex codes
+        const COLORS = [
+            { name: "Rojo", hex: "#ef4444" },
+            { name: "Azul", hex: "#3b82f6" },
+            { name: "Verde", hex: "#22c55e" },
+            { name: "Amarillo", hex: "#eab308" },
+            { name: "Naranja", hex: "#f97316" },
+            { name: "Morado", hex: "#a855f7" },
+            { name: "Rosa", hex: "#ec4899" },
+            { name: "Café", hex: "#854d0e" },
+            { name: "Celeste", hex: "#06b6d4" },
+            { name: "Blanco", hex: "#f8fafc" }
+        ];
+
+        // Shapes definitions
+        const SHAPES = [
+            { id: "circle", name: "Círculo" },
+            { id: "square", name: "Cuadrado" },
+            { id: "triangle", name: "Triángulo" },
+            { id: "star", name: "Estrella" },
+            { id: "diamond", name: "Rombo" },
+            { id: "hexagon", name: "Hexágono" },
+            { id: "oval", name: "Óvalo" },
+            { id: "heart", name: "Corazón" },
+            { id: "pentagon", name: "Pentágono" },
+            { id: "rectangle", name: "Rectángulo" }
+        ];
+
+        // Vowels list
+        const VOWELS = ["A", "E", "I", "O", "U"];
+
+        // Numbers 1 to 10
+        const NUMBERS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+
+        // Game state variables
+        let currentLevel = 1;
+        let hits = 0;
+        let misses = 0;
+        let targets = []; // Array of 20 kitchen items
+        let chalkboardTargets = []; // Array of 10 board items
+        let isAudioEnabled = true;
+
+        // Ball physics & drag variables
+        let isDragging = false;
+        let ballOrigin = { x: 0, y: 0 };
+        let ballCurrent = { x: 0, y: 0 };
+        let isBallInMotion = false;
+
+        // Synth audio configuration
+        let synth = window.speechSynthesis;
+        let spanishVoice = null;
+
+        function initVoices() {
+            if (!synth) return;
+            let voices = synth.getVoices();
+            // Search for Latin Spanish or Mexican voice
+            spanishVoice = voices.find(v => v.lang.includes('es-MX') || v.lang.includes('es-419') || v.lang.includes('es-US')) ||
+                           voices.find(v => v.lang.startsWith('es')) || null;
+        }
+
+        if (window.speechSynthesis) {
+            window.speechSynthesis.onvoiceschanged = initVoices;
+            initVoices();
+        }
+
+        function speak(text, onEndCallback) {
+            if (!isAudioEnabled || !synth) {
+                if (onEndCallback) setTimeout(onEndCallback, 50);
+                return;
+            }
+            try {
+                synth.cancel(); // Cancel ongoing speech
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.rate = 0.95;
+                utterance.pitch = 1.05;
+                if (spanishVoice) {
+                    utterance.voice = spanishVoice;
+                } else {
+                    utterance.lang = 'es-MX';
+                }
+                
+                let callbackFired = false;
+                const safeCallback = () => {
+                    if (!callbackFired) {
+                        callbackFired = true;
+                        if (onEndCallback) onEndCallback();
+                    }
+                };
+
+                utterance.onend = safeCallback;
+                utterance.onerror = safeCallback;
+                // Safety fallback timeout in case audio speech gets blocked on mobile
+                setTimeout(safeCallback, 2500);
+
+                synth.speak(utterance);
+            } catch (err) {
+                if (onEndCallback) onEndCallback();
+            }
+        }
+
+        function toggleAudio() {
+            isAudioEnabled = !isAudioEnabled;
+            const icon = document.getElementById('audio-icon');
+            if (isAudioEnabled) {
+                icon.className = "fa-solid fa-volume-high text-sky-400";
+                speak("Voz activada");
+            } else {
+                icon.className = "fa-solid fa-volume-xmark text-slate-500";
+            }
+        }
+
+        // Helper to get random array elements
+        function getRandomArrayElements(arr, count) {
+            let shuffled = [...arr].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, count);
+        }
+
+        function initLevel(level) {
+            currentLevel = level;
+            hits = 0;
+            misses = 0;
+            updateStatsDisplay();
+
+            const levelNames = {
+                1: "Nivel 1: Figuras Geométricas",
+                2: "Nivel 2: Vocales",
+                3: "Nivel 3: Números (1 al 10)"
+            };
+            document.getElementById('level-display').innerText = levelNames[level];
+
+            chalkboardTargets = [];
+            targets = [];
+
+            if (level === 1) {
+                // LEVEL 1: Shapes
+                let selectedShapes = getRandomArrayElements(SHAPES, 10);
+                let selectedColors = getRandomArrayElements(COLORS, 10);
+
+                for (let i = 0; i < 10; i++) {
+                    chalkboardTargets.push({
+                        id: i,
+                        shape: selectedShapes[i].id,
+                        shapeName: selectedShapes[i].name,
+                        color: selectedColors[i].hex,
+                        colorName: selectedColors[i].name,
+                        found: false
+                    });
+                }
+            } else if (level === 2) {
+                // LEVEL 2: Vowels
+                let selectedColors = getRandomArrayElements(COLORS, 10);
+                for (let i = 0; i < 10; i++) {
+                    let vowel = VOWELS[i % VOWELS.length];
+                    chalkboardTargets.push({
+                        id: i,
+                        vowel: vowel,
+                        color: selectedColors[i].hex,
+                        colorName: selectedColors[i].name,
+                        found: false
+                    });
+                }
+            } else if (level === 3) {
+                // LEVEL 3: Numbers 1-10
+                let selectedColors = getRandomArrayElements(COLORS, 10);
+                for (let i = 0; i < 10; i++) {
+                    chalkboardTargets.push({
+                        id: i,
+                        number: NUMBERS[i],
+                        color: selectedColors[i].hex,
+                        colorName: selectedColors[i].name,
+                        found: false
+                    });
+                }
+            }
+
+            // Create 20 kitchen items (10 matching the chalkboard, 10 distractors)
+            let matchingKitchenItems = chalkboardTargets.map(item => ({ ...item, isMatch: true }));
+
+            // Generate 10 distractor items guaranteed NOT to match any chalkboard item
+            let distractors = [];
+            let validPool = [];
+
+            if (level === 1) {
+                SHAPES.forEach(shape => {
+                    COLORS.forEach(color => {
+                        let matchesBoard = chalkboardTargets.some(b => b.shape === shape.id && b.color === color.hex);
+                        if (!matchesBoard) {
+                            validPool.push({
+                                shape: shape.id,
+                                shapeName: shape.name,
+                                color: color.hex,
+                                colorName: color.name
+                            });
+                        }
+                    });
+                });
+            } else if (level === 2) {
+                VOWELS.forEach(vowel => {
+                    COLORS.forEach(color => {
+                        let matchesBoard = chalkboardTargets.some(b => b.vowel === vowel && b.color === color.hex);
+                        if (!matchesBoard) {
+                            validPool.push({
+                                vowel: vowel,
+                                color: color.hex,
+                                colorName: color.name
+                            });
+                        }
+                    });
+                });
+            } else if (level === 3) {
+                NUMBERS.forEach(num => {
+                    COLORS.forEach(color => {
+                        let matchesBoard = chalkboardTargets.some(b => b.number === num && b.color === color.hex);
+                        if (!matchesBoard) {
+                            validPool.push({
+                                number: num,
+                                color: color.hex,
+                                colorName: color.name
+                            });
+                        }
+                    });
+                });
+            }
+
+            distractors = getRandomArrayElements(validPool, 10).map(d => ({ ...d, isMatch: false }));
+
+            // Combine and shuffle kitchen targets
+            targets = [...matchingKitchenItems, ...distractors].sort(() => 0.5 - Math.random());
+
+            renderChalkboard();
+            renderKitchenTargets();
+            resetBallPosition();
+        }
+
+        function renderChalkboard() {
+            const grid = document.getElementById('chalkboard-grid');
+            grid.innerHTML = '';
+
+            chalkboardTargets.forEach(item => {
+                const el = document.createElement('div');
+                el.className = `chalk-item ${item.found ? 'found' : ''}`;
+                el.id = `chalk-item-${item.id}`;
+
+                let svgContent = getTargetSVG(item, 32);
+                el.innerHTML = svgContent;
+                grid.appendChild(el);
+            });
+        }
+
+        // Kitchen target preset positions over realistic kitchen spots (in percentage)
+        const KITCHEN_SPOTS = [
+            { x: 12, y: 18 }, { x: 25, y: 15 }, { x: 42, y: 12 }, { x: 62, y: 15 }, { x: 80, y: 16 },
+            { x: 88, y: 25 }, { x: 10, y: 38 }, { x: 28, y: 42 }, { x: 48, y: 38 }, { x: 68, y: 40 },
+            { x: 85, y: 45 }, { x: 22, y: 58 }, { x: 38, y: 55 }, { x: 55, y: 52 }, { x: 72, y: 58 },
+            { x: 86, y: 62 }, { x: 50, y: 22 }, { x: 60, y: 28 }, { x: 75, y: 32 }, { x: 35, y: 28 }
+        ];
+
+        function renderKitchenTargets() {
+            const layer = document.getElementById('targets-layer');
+            layer.innerHTML = '';
+
+            targets.forEach((item, index) => {
+                const spot = KITCHEN_SPOTS[index % KITCHEN_SPOTS.length];
+                const el = document.createElement('div');
+                el.className = 'target-item';
+                el.id = `target-${index}`;
+                el.style.left = `${spot.x}%`;
+                el.style.top = `${spot.y}%`;
+
+                // Add bounding box info for hit detection
+                item.xPct = spot.x;
+                item.yPct = spot.y;
+                item.hit = false;
+
+                let svgContent = getTargetSVG(item, 40);
+                el.innerHTML = svgContent;
+
+                // Touch & Click direct trigger fallback
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    if (!isBallInMotion) handleHitTarget(item, index);
+                };
+
+                layer.appendChild(el);
+            });
+        }
+
+        function getTargetSVG(item, size = 40) {
+            const color = item.color;
+            let innerContent = '';
+
+            if (currentLevel === 1) {
+                // Shape SVGs
+                switch (item.shape) {
+                    case 'circle':
+                        innerContent = `<circle cx="25" cy="25" r="20" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'square':
+                        innerContent = `<rect x="6" y="6" width="38" height="38" rx="4" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'triangle':
+                        innerContent = `<polygon points="25,5 45,42 5,42" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'star':
+                        innerContent = `<polygon points="25,2 32,17 49,18 36,29 40,46 25,36 10,46 14,29 1,18 18,17" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'diamond':
+                        innerContent = `<polygon points="25,3 46,25 25,47 4,25" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'hexagon':
+                        innerContent = `<polygon points="25,3 45,14 45,36 25,47 5,36 5,14" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'oval':
+                        innerContent = `<ellipse cx="25" cy="25" rx="22" ry="15" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'heart':
+                        innerContent = `<path d="M25,43 C25,43 5,26 5,15 C5,8 11,3 18,3 C22,3 25,7 25,7 C25,7 28,3 32,3 C39,3 45,8 45,15 C45,26 25,43 25,43 Z" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'pentagon':
+                        innerContent = `<polygon points="25,4 46,19 38,44 12,44 4,19" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    case 'rectangle':
+                        innerContent = `<rect x="4" y="12" width="42" height="26" rx="3" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                        break;
+                    default:
+                        innerContent = `<circle cx="25" cy="25" r="20" fill="${color}"/>`;
+                }
+            } else if (currentLevel === 2) {
+                // Vowels
+                innerContent = `
+                    <circle cx="25" cy="25" r="22" fill="#1e293b" stroke="${color}" stroke-width="4"/>
+                    <text x="25" y="34" font-size="28" font-weight="900" fill="${color}" text-anchor="middle" font-family="Arial">${item.vowel}</text>`;
+            } else {
+                // Numbers
+                innerContent = `
+                    <rect x="4" y="4" width="42" height="42" rx="10" fill="#1e293b" stroke="${color}" stroke-width="4"/>
+                    <text x="25" y="34" font-size="26" font-weight="900" fill="${color}" text-anchor="middle" font-family="Arial">${item.number}</text>`;
+            }
+
+            return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${innerContent}</svg>`;
+        }
+
+        const launcher = document.getElementById('ball-launcher');
+        const ball = document.getElementById('ball');
+        const line = document.getElementById('slingshot-line');
+        const container = document.getElementById('game-container');
+
+        function resetBallPosition() {
+            isBallInMotion = false;
+            ball.style.transition = 'none';
+            ball.style.transform = 'translate(0px, 0px)';
+            line.setAttribute('x1', 0);
+            line.setAttribute('y1', 0);
+            line.setAttribute('x2', 0);
+            line.setAttribute('y2', 0);
+        }
+
+        function getContainerCoords(e) {
+            const rect = container.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function onDragStart(e) {
+            if (isBallInMotion) return;
+            isDragging = true;
+            const ballRect = ball.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            
+            ballOrigin = {
+                x: ballRect.left - containerRect.left + ballRect.width / 2,
+                y: ballRect.top - containerRect.top + ballRect.height / 2
+            };
+        }
+
+        function onDragMove(e) {
+            if (!isDragging || isBallInMotion) return;
+            if (e.cancelable) e.preventDefault();
+            const currentPos = getContainerCoords(e);
+            
+            // Calculate pull offset
+            let dx = currentPos.x - ballOrigin.x;
+            let dy = currentPos.y - ballOrigin.y;
+
+            // Cap max pull distance
+            const maxPull = 100;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist > maxPull) {
+                dx = (dx / dist) * maxPull;
+                dy = (dy / dist) * maxPull;
+            }
+
+            ball.style.transform = `translate(${dx}px, ${dy}px)`;
+            
+            // Draw slingshot line
+            line.setAttribute('x1', ballOrigin.x);
+            line.setAttribute('y1', ballOrigin.y);
+            line.setAttribute('x2', ballOrigin.x + dx);
+            line.setAttribute('y2', ballOrigin.y + dy);
+
+            ballCurrent = { dx, dy };
+        }
+
+        function onDragEnd(e) {
+            if (!isDragging || isBallInMotion) return;
+            isDragging = false;
+            line.setAttribute('x1', 0);
+            line.setAttribute('y1', 0);
+            line.setAttribute('x2', 0);
+            line.setAttribute('y2', 0);
+
+            if (!ballCurrent.dx && !ballCurrent.dy) return;
+
+            // Launch velocity is opposite to pull vector
+            const vx = -ballCurrent.dx * 0.25;
+            const vy = -ballCurrent.dy * 0.25;
+
+            // If drag was tiny, ignore launch
+            if (Math.abs(vx) < 1 && Math.abs(vy) < 1) {
+                resetBallPosition();
+                return;
+            }
+
+            launchBall(vx, vy);
+            ballCurrent = { dx: 0, dy: 0 };
+        }
+
+        // Attach Mouse & Touch Drag Events for Mobile and Tablet
+        launcher.addEventListener('mousedown', onDragStart);
+        window.addEventListener('mousemove', onDragMove);
+        window.addEventListener('mouseup', onDragEnd);
+
+        launcher.addEventListener('touchstart', onDragStart, { passive: false });
+        window.addEventListener('touchmove', onDragMove, { passive: false });
+        window.addEventListener('touchend', onDragEnd);
+
+        function launchBall(vx, vy) {
+            isBallInMotion = true;
+            let currX = ballOrigin.x;
+            let currY = ballOrigin.y;
+
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+
+            let startTime = null;
+
+            function animateBall(timestamp) {
+                if (!startTime) startTime = timestamp;
+                
+                currX += vx * 12;
+                currY += vy * 12;
+
+                ball.style.transform = `translate(${currX - ballOrigin.x}px, ${currY - ballOrigin.y}px)`;
+
+                // Check collision with kitchen targets
+                let hitTargetIndex = checkCollisions(currX, currY);
+
+                if (hitTargetIndex !== -1) {
+                    // Collision detected!
+                    handleHitTarget(targets[hitTargetIndex], hitTargetIndex);
+                    setTimeout(resetBallPosition, 600);
+                    return;
+                }
+
+                // Check out of bounds
+                if (currX < 0 || currX > containerWidth || currY < 0 || currY > containerHeight) {
+                    // Missed everything!
+                    handleMiss(currX, currY, "¡Fuera!");
+                    setTimeout(resetBallPosition, 500);
+                    return;
+                }
+
+                requestAnimationFrame(animateBall);
+            }
+
+            requestAnimationFrame(animateBall);
+        }
+
+        function checkCollisions(x, y) {
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+
+            for (let i = 0; i < targets.length; i++) {
+                let target = targets[i];
+                if (target.hit) continue;
+
+                let targetX = (target.xPct / 100) * containerWidth;
+                let targetY = (target.yPct / 100) * containerHeight;
+
+                let dist = Math.hypot(x - targetX, y - targetY);
+                if (dist < 38) { // Hit threshold radius
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function handleHitTarget(item, index) {
+            if (item.hit) return;
+            item.hit = true;
+
+            // Hide element visually from kitchen
+            const targetEl = document.getElementById(`target-${index}`);
+            if (targetEl) {
+                targetEl.style.transform = 'translate(-50%, -50%) scale(0)';
+                targetEl.style.opacity = '0';
+            }
+
+            // Check if item matches any remaining chalkboard target
+            let matchIndex = chalkboardTargets.findIndex(b => !b.found && isItemEqual(b, item));
+
+            if (matchIndex !== -1) {
+                // SUCCESS HIT!
+                chalkboardTargets[matchIndex].found = true;
+                hits++;
+                updateStatsDisplay();
+
+                // Update Chalkboard UI
+                const chalkEl = document.getElementById(`chalk-item-${chalkboardTargets[matchIndex].id}`);
+                if (chalkEl) chalkEl.classList.add('found');
+
+                // Get announcement phrase based on current level
+                let itemSpeech = "";
+                if (currentLevel === 1) {
+                    itemSpeech = `${item.shapeName} ${item.colorName}`;
+                } else if (currentLevel === 2) {
+                    itemSpeech = `${item.vowel} ${item.colorName}`;
+                } else {
+                    itemSpeech = `Número ${item.number} ${item.colorName}`;
+                }
+
+                showFeedback("¡BUENA PUNTERÍA!", "#22c55e", item.xPct, item.yPct);
+                speak(`${itemSpeech}. BUENA PUNTERÍA`, () => {
+                    checkLevelCompletion();
+                });
+
+            } else {
+                // FAIL / MISS HIT (Hit a distractor or already found shape)
+                handleMiss((item.xPct / 100) * container.clientWidth, (item.yPct / 100) * container.clientHeight, "VUELVE A INTENTAR");
+            }
+        }
+
+        function isItemEqual(a, b) {
+            if (currentLevel === 1) return a.shape === b.shape && a.color === b.color;
+            if (currentLevel === 2) return a.vowel === b.vowel && a.color === b.color;
+            if (currentLevel === 3) return a.number === b.number && a.color === b.color;
+            return false;
+        }
+
+        function handleMiss(xPx, yPx, text) {
+            misses++;
+            updateStatsDisplay();
+
+            let xPct = (xPx / container.clientWidth) * 100;
+            let yPct = (yPx / container.clientHeight) * 100;
+
+            showFeedback("VUELVE A INTENTAR", "#ef4444", xPct || 50, yPct || 50);
+            speak("VUELVE A INTENTAR");
+        }
+
+        function showFeedback(text, color, xPct, yPct) {
+            const pop = document.createElement('div');
+            pop.className = 'feedback-pop';
+            pop.innerText = text;
+            pop.style.color = color;
+            pop.style.left = `${xPct}%`;
+            pop.style.top = `${yPct}%`;
+
+            container.appendChild(pop);
+            setTimeout(() => pop.remove(), 1200);
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('hits-count').innerText = hits;
+            document.getElementById('misses-count').innerText = misses;
+        }
+
+        function checkLevelCompletion() {
+            if (hits >= 10) {
+                // Level Finished! Check fail condition (< 5 misses)
+                setTimeout(() => {
+                    if (misses < 5) {
+                        // Advanced to next level
+                        if (currentLevel < 3) {
+                            showModal(
+                                "¡Nivel Completado!",
+                                `¡Excelente trabajo! Tuviste solo ${misses} fallas. ¿Listo para el siguiente nivel?`,
+                                "PASAR AL SIGUIENTE NIVEL",
+                                () => {
+                                    initLevel(currentLevel + 1);
+                                }
+                            );
+                            speak("¡Excelente trabajo! Pasas al siguiente nivel.");
+                        } else {
+                            // Game finished!
+                            showModal(
+                                "🏆 ¡FELICIDADES!",
+                                `¡Has completado todos los niveles de la cocina con ${misses} fallas en total!`,
+                                "JUGAR DE NUEVO",
+                                () => {
+                                    initLevel(1);
+                                }
+                            );
+                            speak("¡Felicidades! Has completado todo el juego con buena puntería.");
+                        }
+                    } else {
+                        // Failed level (>= 5 misses)
+                        showModal(
+                            "¡Casi lo logras!",
+                            `Tuviste ${misses} fallas (máximo permitido: 4). Debes intentar el nivel de nuevo.`,
+                            "REINTENTAR NIVEL",
+                            () => {
+                                initLevel(currentLevel);
+                            }
+                        );
+                        speak("Tuviste más de cuatro fallas. Vuelve a intentar el nivel.");
+                    }
+                }, 500);
+            }
+        }
+
+        let modalCallback = null;
+
+        function showModal(title, message, buttonText, onClickAction) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('modal-btn').innerText = buttonText;
+            modalCallback = onClickAction;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            const modalEl = document.getElementById('modal');
+            if (modalEl) modalEl.classList.add('hidden');
+            
+            // Resume speech synthesis if paused by browser autoplay policies
+            if (synth && synth.resume) {
+                synth.resume();
+            }
+
+            if (typeof modalCallback === 'function') {
+                const cb = modalCallback;
+                modalCallback = null;
+                cb();
+            }
+        }
+
+        function restartCurrentLevel() {
+            initLevel(currentLevel);
+        }
+
+        function startApp() {
+            initLevel(1);
+            showModal(
+                "¡Puntería en la Cocina!",
+                "Observa los 10 objetivos en el pizarrón (inferior izquierdo). Arrastra y suelta la pelota para lanzarla hacia las figuras coincidentes de la cocina.",
+                "¡EMPEZAR A JUGAR!",
+                () => {
+                    speak("¡Bienvenido! Encuentra los elementos del pizarrón en la cocina.");
+                }
+            );
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(startApp, 50);
+        } else {
+            document.addEventListener('DOMContentLoaded', startApp);
+        }
+    </script>
+</body>
+</html>
